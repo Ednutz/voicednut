@@ -1,0 +1,49 @@
+name: API Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - ".github/workflows/api-deploy.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.EC2_KNOWN_HOSTS }}
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+        run: |
+          # Create the deploy script
+          echo "#!/bin/bash
+          cd /home/$EC2_USERNAME/voicednut/api
+          git pull origin main
+          npm install
+          pm2 reload ecosystem.config.js --only voicednut-api
+          " > deploy.sh
+
+          # Make it executable
+          chmod +x deploy.sh
+
+          # Copy and execute on EC2
+          scp -o StrictHostKeyChecking=no deploy.sh $EC2_USERNAME@$EC2_HOST:~/
+          ssh -o StrictHostKeyChecking=no $EC2_USERNAME@$EC2_HOST "bash ~/deploy.sh"
