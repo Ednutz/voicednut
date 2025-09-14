@@ -7,6 +7,21 @@ async function makeApiCallWithRetry(url, data, maxRetries = 3) {
     for (let i = 0; i < maxRetries; i++) {
         try {
             const response = await axios.post(url, data);
+            
+            // Notify WebSocket clients about the call
+            if (url.includes('/outbound-call')) {
+                await axios.post(`${config.apiUrl}/ws/broadcast`, {
+                    type: 'call_initiated',
+                    data: {
+                        userId: data.userId,
+                        phone: data.phone,
+                        prompt: data.prompt,
+                        callId: response.data.callId
+                    },
+                    targetUserIds: [data.userId]
+                });
+            }
+            
             return response;
         } catch (error) {
             if (i === maxRetries - 1) throw error;

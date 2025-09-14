@@ -1,5 +1,8 @@
-// bot/mini-app/src/pages/IndexPage/IndexPage.tsx
 import { type FC, useState, useEffect, type FormEvent, useCallback } from 'react';
+import { useWebSocket } from '@/contexts/WebSocketContext';
+import { AsyncContent, LoadingSpinner } from '@/components/common/AsyncContent/AsyncContent';
+import { DataCard } from '@/components/common/DataCard/DataCard';
+import './IndexPage.css';
 
 interface UserStats {
   total_calls: number;
@@ -8,6 +11,14 @@ interface UserStats {
   this_month_sms: number;
   success_rate: number;
   last_activity: string;
+  call_trend?: {
+    value: number;
+    isPositive: boolean;
+  };
+  sms_trend?: {
+    value: number;
+    isPositive: boolean;
+  };
 }
 
 interface CallFormData {
@@ -52,7 +63,7 @@ export const IndexPage: FC = () => {
 
   const handleCallSubmit = useCallback(async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    
+
     if (!callForm.phone || !callForm.prompt || !callForm.first_message) {
       setError('All fields are required');
       return;
@@ -92,252 +103,147 @@ export const IndexPage: FC = () => {
     }
   }, [callForm, fetchUserStats]);
 
-  const renderDashboard = (): JSX.Element => (
-    <div style={{ padding: '20px' }}>
-      <h1>VoicedNut Dashboard</h1>
-      
-      {isLoading && <p>Loading...</p>}
-      {error && (
-        <div style={{
-          padding: '16px',
-          marginBottom: '20px',
-          background: 'rgba(255, 99, 132, 0.1)',
-          color: 'rgb(255, 99, 132)',
-          borderRadius: '4px'
-        }}>
-          {error}
-        </div>
-      )}
-      
-      {userStats && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '20px'
-        }}>
-          <div style={{
-            background: 'var(--tg-theme-secondary-bg-color)',
-            padding: '16px',
-            borderRadius: '8px'
-          }}>
-            <h3>Total Calls</h3>
-            <p style={{ fontSize: '2em', margin: '0' }}>{userStats.total_calls}</p>
+  const renderDashboard = () => (
+    <div className="dashboard animate-in">
+      <h1 className="dashboard__title gradient-text">VoicedNut Dashboard</h1>
+
+      <AsyncContent
+        isLoading={isLoading}
+        error={error ? new Error(error) : null}
+        data={userStats}
+        loadingFallback={
+          <div className="dashboard__stats">
+            <DataCard title="Total Calls" loading />
+            <DataCard title="Total SMS" loading />
+            <DataCard title="Monthly Calls" loading />
+            <DataCard title="Success Rate" loading />
           </div>
-          <div style={{
-            background: 'var(--tg-theme-secondary-bg-color)',
-            padding: '16px',
-            borderRadius: '8px'
-          }}>
-            <h3>Total SMS</h3>
-            <p style={{ fontSize: '2em', margin: '0' }}>{userStats.total_sms}</p>
+        }
+      >
+        {(stats) => (
+          <div className="dashboard__stats">
+            <DataCard
+              title="Total Calls"
+              value={stats.total_calls.toString()}
+              trend={stats.call_trend}
+              icon={<span>📞</span>}
+            />
+            <DataCard
+              title="Total SMS"
+              value={stats.total_sms.toString()}
+              trend={stats.sms_trend}
+              icon={<span>✉️</span>}
+            />
+            <DataCard
+              title="Monthly Calls"
+              value={stats.this_month_calls.toString()}
+              icon={<span>📊</span>}
+            />
+            <DataCard
+              title="Success Rate"
+              value={`${stats.success_rate}%`}
+              trend={{
+                value: stats.success_rate - 50,
+                isPositive: stats.success_rate >= 50
+              }}
+              icon={<span>📈</span>}
+            />
           </div>
-          <div style={{
-            background: 'var(--tg-theme-secondary-bg-color)',
-            padding: '16px',
-            borderRadius: '8px'
-          }}>
-            <h3>This Month</h3>
-            <p>Calls: {userStats.this_month_calls}</p>
-            <p>SMS: {userStats.this_month_sms}</p>
-          </div>
-          <div style={{
-            background: 'var(--tg-theme-secondary-bg-color)',
-            padding: '16px',
-            borderRadius: '8px'
-          }}>
-            <h3>Success Rate</h3>
-            <p style={{ fontSize: '2em', margin: '0' }}>{userStats.success_rate}%</p>
-          </div>
-        </div>
-      )}
+        )}
+      </AsyncContent>
     </div>
   );
 
-  const renderCallForm = (): JSX.Element => (
-    <div style={{ padding: '20px' }}>
-      <h2>Start AI Call</h2>
-      <form onSubmit={(e) => { void handleCallSubmit(e); }}>
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--tg-theme-text-color)'
-          }}>
-            Phone Number:
-          </label>
+  const renderCallForm = () => (
+    <div className="form-container animate-in">
+      <h2 className="dashboard__title gradient-text">Make a Call</h2>
+
+      <form className="form glass" onSubmit={handleCallSubmit}>
+        <div className="form-group">
+          <label className="form-label" htmlFor="phone">Phone Number</label>
           <input
+            id="phone"
             type="tel"
+            className="form-input"
             value={callForm.phone}
             onChange={(e) => setCallForm(prev => ({ ...prev, phone: e.target.value }))}
             placeholder="+1234567890"
             required
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid var(--tg-theme-hint-color)',
-              borderRadius: '4px',
-              background: 'var(--tg-theme-bg-color)',
-              color: 'var(--tg-theme-text-color)'
-            }}
           />
         </div>
 
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--tg-theme-text-color)'
-          }}>
-            AI Prompt:
-          </label>
+        <div className="form-group">
+          <label className="form-label" htmlFor="prompt">AI Prompt</label>
           <textarea
+            id="prompt"
+            className="form-input form-textarea"
             value={callForm.prompt}
             onChange={(e) => setCallForm(prev => ({ ...prev, prompt: e.target.value }))}
-            placeholder="Describe the AI's personality and behavior..."
+            placeholder="Enter AI conversation prompt..."
             required
-            rows={4}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid var(--tg-theme-hint-color)',
-              borderRadius: '4px',
-              background: 'var(--tg-theme-bg-color)',
-              color: 'var(--tg-theme-text-color)',
-              resize: 'vertical'
-            }}
           />
         </div>
 
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '8px',
-            color: 'var(--tg-theme-text-color)'
-          }}>
-            First Message:
-          </label>
+        <div className="form-group">
+          <label className="form-label" htmlFor="first_message">First Message</label>
           <textarea
+            id="first_message"
+            className="form-input form-textarea"
             value={callForm.first_message}
             onChange={(e) => setCallForm(prev => ({ ...prev, first_message: e.target.value }))}
-            placeholder="What the AI should say when the call connects..."
+            placeholder="Enter the first message..."
             required
-            rows={3}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid var(--tg-theme-hint-color)',
-              borderRadius: '4px',
-              background: 'var(--tg-theme-bg-color)',
-              color: 'var(--tg-theme-text-color)',
-              resize: 'vertical'
-            }}
           />
         </div>
+
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
 
         <button
           type="submit"
-          disabled={isLoading}
-          style={{
-            width: '100%',
-            padding: '16px',
-            background: 'var(--tg-theme-button-color)',
-            color: 'var(--tg-theme-button-text-color)',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: '500',
-            fontSize: '16px',
-            opacity: isLoading ? 0.7 : 1
-          }}
+          className="form-button"
+          disabled={isLoading || !isConnected}
         >
-          {isLoading ? 'Starting Call...' : 'Start AI Call'}
+          {isLoading ? 'Initiating Call...' : 'Start Call'}
         </button>
       </form>
     </div>
   );
 
-  const renderContent = (): JSX.Element => {
-    switch (activeTab) {
-      case 'call':
-        return renderCallForm();
-      case 'sms':
-        return (
-          <div style={{ padding: '20px' }}>
-            <h2>SMS Feature</h2>
-            <p>SMS functionality coming soon...</p>
-          </div>
-        );
-      default:
-        return renderDashboard();
-    }
-  };
-
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid var(--tg-theme-hint-color)',
-        background: 'var(--tg-theme-secondary-bg-color)'
-      }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>VoicedNut</h1>
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1 }}>
-        {renderContent()}
-      </div>
-
-      {/* Navigation */}
-      <div style={{
-        display: 'flex',
-        borderTop: '1px solid var(--tg-theme-hint-color)',
-        background: 'var(--tg-theme-secondary-bg-color)'
-      }}>
+    <div>
+      <nav className="dashboard__nav">
         <button
+          className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => setActiveTab('dashboard')}
-          style={{
-            flex: 1,
-            padding: '12px',
-            border: 'none',
-            background: activeTab === 'dashboard' ? 'var(--tg-theme-button-color)' : 'transparent',
-            color: activeTab === 'dashboard' ? 'var(--tg-theme-button-text-color)' : 'var(--tg-theme-text-color)',
-            cursor: 'pointer',
-            fontSize: '0.9rem'
-          }}
         >
           Dashboard
         </button>
         <button
+          className={`nav-button ${activeTab === 'call' ? 'active' : ''}`}
           onClick={() => setActiveTab('call')}
-          style={{
-            flex: 1,
-            padding: '12px',
-            border: 'none',
-            background: activeTab === 'call' ? 'var(--tg-theme-button-color)' : 'transparent',
-            color: activeTab === 'call' ? 'var(--tg-theme-button-text-color)' : 'var(--tg-theme-text-color)',
-            cursor: 'pointer',
-            fontSize: '0.9rem'
-          }}
         >
-          AI Call
+          Make Call
         </button>
         <button
+          className={`nav-button ${activeTab === 'sms' ? 'active' : ''}`}
           onClick={() => setActiveTab('sms')}
-          style={{
-            flex: 1,
-            padding: '12px',
-            border: 'none',
-            background: activeTab === 'sms' ? 'var(--tg-theme-button-color)' : 'transparent',
-            color: activeTab === 'sms' ? 'var(--tg-theme-button-text-color)' : 'var(--tg-theme-text-color)',
-            cursor: 'pointer',
-            fontSize: '0.9rem'
-          }}
         >
-          SMS
+          Send SMS
         </button>
-      </div>
+      </nav>
+
+      {activeTab === 'dashboard' && renderDashboard()}
+      {activeTab === 'call' && renderCallForm()}
+      {activeTab === 'sms' && (
+        <div className="form-container animate-in">
+          <h2 className="dashboard__title gradient-text">SMS Feature</h2>
+          <p className="text-theme-hint text-center">SMS feature coming soon!</p>
+        </div>
+      )}
     </div>
   );
 };

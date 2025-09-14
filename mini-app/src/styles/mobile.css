@@ -1,0 +1,177 @@
+/* Enhanced Touch Support */
+:root {
+  --touch-target-min: 44px; /* Minimum touch target size */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+}
+
+/* Notch and Safe Area Support */
+.page-container {
+  padding-top: calc(var(--space-md) + var(--safe-area-inset-top));
+  padding-bottom: calc(var(--space-md) + var(--safe-area-inset-bottom));
+  padding-left: calc(var(--space-md) + var(--safe-area-inset-left));
+  padding-right: calc(var(--space-md) + var(--safe-area-inset-right));
+}
+
+/* Touch-Optimized Form Elements */
+@media (hover: none) and (pointer: coarse) {
+  .form-input,
+  .form-textarea,
+  .button,
+  .nav-button {
+    min-height: var(--touch-target-min);
+    padding: calc(var(--space-md) + 2px);
+  }
+
+  .form-button {
+    min-height: var(--touch-target-min);
+    padding: calc(var(--space-md) + 4px);
+    margin-top: var(--space-md);
+  }
+
+  .nav-button {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .nav-button::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+
+  .nav-button:active::after {
+    opacity: 0.1;
+  }
+
+  /* Enhanced Scroll Experience */
+  .dashboard__stats,
+  .form-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+  }
+
+  /* Disable Hover Effects */
+  .hover-scale:hover,
+  .card:hover,
+  .button:hover,
+  .form-button:hover {
+    transform: none !important;
+  }
+
+  /* Active State Feedback */
+  .data-card:active,
+  .form-button:active,
+  .button:active {
+    transform: scale(0.98);
+    transition: transform 0.1s;
+  }
+}
+
+/* Enhanced Mobile Typography */
+@media (max-width: 768px) {
+  :root {
+    --font-size-base: 16px;
+    --line-height-base: 1.4;
+  }
+
+  body {
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-base);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .dashboard__title {
+    font-size: 1.75rem;
+  }
+
+  .data-card__title {
+    font-size: 0.9rem;
+  }
+
+  .data-card__value {
+    font-size: 1.25rem;
+  }
+
+  /* Improved Form Spacing */
+  .form-group {
+    margin-bottom: var(--space-md);
+  }
+
+  .form-label {
+    margin-bottom: var(--space-xs);
+    font-size: 0.9rem;
+  }
+
+  /* Touch-Friendly Navigation */
+  .dashboard__nav {
+    padding: var(--space-xs);
+    gap: var(--space-xs);
+  }
+
+  .nav-button {
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.9rem;
+  }
+}
+
+/* System Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(0, 0, 0, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
+  }
+
+  .loading-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+  }
+}
+
+/* Enhanced Scrollbars */
+@media (hover: hover) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--theme-bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--theme-hint);
+    border-radius: var(--radius-md);
+    border: 2px solid var(--theme-bg-secondary);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-text);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

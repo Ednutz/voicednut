@@ -14,6 +14,7 @@ const { EnhancedSmsService } = require('./routes/sms.js');
 const Database = require('./db/db');
 const { webhookService } = require('./routes/status');
 const DynamicFunctionEngine = require('./functions/DynamicFunctionEngine');
+const WebSocketManager = require('./services/WebSocketManager');
 
 const VoiceResponse = require('twilio').twiml.VoiceResponse;
 
@@ -65,29 +66,14 @@ async function startServer() {
   }
 }
 
-// Enhanced WebSocket connection handler with dynamic functions
-app.ws('/connection', (ws) => {
-  console.log('🔌 New WebSocket connection established'.cyan);
-  
-  try {
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-    });
+// Initialize WebSocket Manager
+const wsManager = new WebSocketManager(db, functionEngine);
 
-    let streamSid;
-    let callSid;
-    let callConfig = null;
-    let callStartTime = null;
-    let functionSystem = null;
-
-    let gptService;
-    const streamService = new StreamService(ws);
-    const transcriptionService = new TranscriptionService();
-    const ttsService = new TextToSpeechService({});
-  
-    let marks = [];
-    let interactionCount = 0;
-    let isInitialized = false;
+// Enhanced WebSocket connection handler
+app.ws('/ws', (ws, req) => {
+  console.log('🔌 New WebSocket connection request'.cyan);
+  wsManager.handleConnection(ws, req);
+});
   
     ws.on('message', async function message(data) {
       try {

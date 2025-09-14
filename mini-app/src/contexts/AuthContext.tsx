@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
-import type { User, AuthState, AuthContextType } from '@/types/auth';
+import type { AuthState, AuthContextType } from '@/types/auth';
+import { authReducer } from './authReducer';
 
 // Initial state
 const initialState: AuthState = {
@@ -8,56 +9,6 @@ const initialState: AuthState = {
     isLoading: true,
     error: null
 };
-
-// Auth reducer
-type AuthAction =
-    | { type: 'LOGIN_START' }
-    | { type: 'LOGIN_SUCCESS'; payload: User }
-    | { type: 'LOGIN_FAILURE'; payload: string }
-    | { type: 'LOGOUT' }
-    | { type: 'CLEAR_ERROR' };
-
-function authReducer(state: AuthState, action: AuthAction): AuthState {
-    switch (action.type) {
-        case 'LOGIN_START':
-            return {
-                ...state,
-                isLoading: true,
-                error: null
-            };
-        case 'LOGIN_SUCCESS':
-            return {
-                ...state,
-                isAuthenticated: true,
-                user: action.payload,
-                isLoading: false,
-                error: null
-            };
-        case 'LOGIN_FAILURE':
-            return {
-                ...state,
-                isAuthenticated: false,
-                user: null,
-                isLoading: false,
-                error: action.payload
-            };
-        case 'LOGOUT':
-            return {
-                ...state,
-                isAuthenticated: false,
-                user: null,
-                isLoading: false,
-                error: null
-            };
-        case 'CLEAR_ERROR':
-            return {
-                ...state,
-                error: null
-            };
-        default:
-            return state;
-    }
-}
 
 // Create context
 const AuthContext = createContext<AuthContextType | null>(null);

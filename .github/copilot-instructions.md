@@ -24,8 +24,9 @@ This project is a voice-based AI system that integrates Twilio, OpenAI/OpenRoute
 
 ### Dynamic Function System (`functions/DynamicFunctionEngine.js`)
 
+The system uses a template-based function registration pattern for all business logic:
+
 ```javascript
-// Business functions MUST follow this template pattern
 functionTemplates.set('inventory_check', {
   name: 'checkInventory',
   description: '...',
@@ -37,12 +38,24 @@ functionTemplates.set('inventory_check', {
 ### Personality Engine (`functions/PersonalityEngine.js`)
 
 - Response generation MUST include '•' markers every 5-10 words for TTS chunking
-- Personalities defined in constructor with tone, pace, formality profiles
-- Context maintained via `conversationContext` object
+- Personalities defined in constructor with profiles (tone, pace, formality)
+- Context tracked via `conversationContext` object properties:
+  - customerMood
+  - communicationStyle
+  - urgencyLevel
+  - techSavviness
+  - responsePatterns
 
 ### Testing Approach
 
-- Unit tests for business functions use simple input/output assertions:
+Each business function must have corresponding test files in `test/` with these conventions:
+
+- Simple input/output assertions
+- Multiple test cases per function
+- Clear test descriptions
+- JSON string outputs
+
+Example:
 
 ```javascript
 test("Expect Airpods Pro to have 10 units", () => {

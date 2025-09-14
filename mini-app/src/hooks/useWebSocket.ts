@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-export interface WebSocketMessage {
-  type: string;
-  payload: any;
-}
+import { EventPayload } from '../types/events';
+
+export type WebSocketMessage = EventPayload;
 
 export interface WebSocketOptions {
   url: string;
@@ -12,11 +11,11 @@ export interface WebSocketOptions {
   onMessage?: (message: WebSocketMessage) => void;
 }
 
-export const useWebSocket = ({ 
-  url, 
-  reconnectAttempts = 5, 
+export const useWebSocket = ({
+  url,
+  reconnectAttempts = 5,
   reconnectInterval = 1000,
-  onMessage 
+  onMessage
 }: WebSocketOptions) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -26,7 +25,7 @@ export const useWebSocket = ({
   const connect = () => {
     try {
       const ws = new WebSocket(url);
-      
+
       ws.onopen = () => {
         console.log('WebSocket connected');
         setIsConnected(true);
@@ -78,7 +77,7 @@ export const useWebSocket = ({
       console.error('WebSocket is not connected');
       return false;
     }
-    
+
     try {
       wsRef.current.send(JSON.stringify(message));
       return true;
@@ -88,10 +87,10 @@ export const useWebSocket = ({
     }
   };
 
-  return { 
-    isConnected, 
-    error, 
+  return {
+    isConnected,
+    error,
     sendMessage,
-    ws: wsRef.current 
+    ws: wsRef.current
   };
 };
