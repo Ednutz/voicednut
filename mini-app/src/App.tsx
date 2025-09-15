@@ -1,79 +1,127 @@
-import { type FC, useEffect, useState } from 'react';
-import { retrieveLaunchParams } from '@telegram-apps/sdk-react';
-import { IndexPage } from '@/pages/IndexPage/IndexPage';
-import { WebSocketProvider } from '@/contexts/WebSocketContext';
-import { ErrorBoundary, LoadingSpinner } from '@/components/common/AsyncContent/AsyncContent';
-import '@/styles/enhanced-theme.css';
-import '@/styles/global.css';
-import '@/styles/mobile.css';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import {
+  ThemeProvider,
+  CssBaseline,
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+} from '@mui/material';
+import {
+  Phone as PhoneIcon,
+  Sms as SmsIcon,
+  Group as UsersIcon,
+  Description as TranscriptsIcon,
+  Settings as SettingsIcon,
+  Home as HomeIcon
+} from '@mui/icons-material';
+import WebApp from '@twa-dev/sdk';
+import { theme } from './styles/theme';
+import { MainLayout } from './components/MainLayout';
+import { CallManager } from './components/CallManager';
+import { SMSComposer } from './components/SMSComposer';
+import { UserManager } from './components/UserManager';
+import { TranscriptViewer } from './components/TranscriptViewer';
+import { ROUTES } from './routes/constants';
+import { DashboardPage } from './pages';
 
-export const App: FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [wsUrl, setWsUrl] = useState<string>('');
+const navItems = [
+  { path: ROUTES.HOME, label: 'Home', icon: HomeIcon },
+  { path: ROUTES.CALL, label: 'Make Call', icon: PhoneIcon },
+  { path: ROUTES.SMS, label: 'Send SMS', icon: SmsIcon },
+  { path: ROUTES.USERS, label: 'Users', icon: UsersIcon },
+  { path: ROUTES.TRANSCRIPTS, label: 'Transcripts', icon: TranscriptsIcon },
+  { path: ROUTES.SETTINGS, label: 'Settings', icon: SettingsIcon },
+];
 
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // Check if we're in development mode
-        if (import.meta.env.DEV) {
-          console.log('Development mode: Using mock launch params');
-          setWsUrl('ws://localhost:3000/ws');
-          setTimeout(() => setIsLoading(false), 1000);
-        } else {
-          const launchParams = retrieveLaunchParams();
-          console.log('Launch params:', launchParams);
-          // Construct WebSocket URL from launch params or environment
-          const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          const wsHost = import.meta.env.VITE_WS_HOST || window.location.host;
-          setWsUrl(`${wsProtocol}//${wsHost}/ws`);
-          setIsLoading(false);
-        }
-      } catch (err) {
-        console.error('Failed to initialize app:', err);
-        setError(new Error('Failed to initialize application. Please ensure you are running the app within Telegram or in development mode.'));
-        setIsLoading(false);
-      }
-    };
+function AppContent() {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const navigate = useNavigate();
 
-    initializeApp();
-  }, []);
-  if (isLoading) {
-    return (
-      <div className="page-container animate-in flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page-container animate-in flex items-center justify-center">
-        <div className="card glass animate-in" style={{ borderLeft: '4px solid #ef4444' }}>
-          <h3 className="gradient-text">Error</h3>
-          <p className="text-theme-text">{error.message}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const wsOptions: WebSocketOptions = {
-    url: import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws',
-    reconnectAttempts: 5,
-    onMessage: (message) => {
-      console.log('WebSocket message received:', message);
-    }
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    setDrawerOpen(false);
   };
 
+  useEffect(() => {
+    WebApp.ready();
+    WebApp.enableClosingConfirmation();
+
+    return () => {
+      WebApp.disableClosingConfirmation();
+    };
+  }, []);
+
   return (
-    <WebSocketProvider options={wsOptions}>
-      <div style={{
-        minHeight: '100vh',
-        background: 'var(--tg-theme-bg-color)',
-        color: 'var(--tg-theme-text-color)'
-      }}>
-        <IndexPage />
-      </div>
-    </WebSocketProvider>
+    <Box sx={{ display: 'flex' }}>
+      <Drawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        sx={{
+          '& .MuiDrawer-paper': {
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+          },
+        }}
+      >
+        <List sx={{ width: 250 }}>
+          {navItems.map(({ path, label, icon: Icon }) => (
+            <ListItem
+              button
+              key={path}
+              onClick={() => handleNavigation(path)}
+            >
+              <ListItemIcon sx={{ color: 'inherit' }}>
+                <Icon />
+              </ListItemIcon>
+              <ListItemText primary={label} />
+            </ListItem>
+          ))}
+        </List>
+      </Drawer>
+
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minHeight: '100vh',
+          bgcolor: 'background.default',
+          color: 'text.primary',
+        }}
+      >
+        <MainLayout title="VoicedNut" onMenuClick={() => setDrawerOpen(true)}>
+          <Routes>
+            <Route path={ROUTES.HOME} element={<DashboardPage />} />
+            <Route path={ROUTES.CALL} element={<CallManager />} />
+            <Route path={ROUTES.SMS} element={<SMSComposer />} />
+            <Route path={ROUTES.USERS} element={<UserManager />} />
+            <Route path={ROUTES.TRANSCRIPTS} element={<TranscriptViewer />} />
+            <Route path={ROUTES.SETTINGS} element={
+              <Box>
+                <h1>Settings</h1>
+                <p>Settings feature coming soon...</p>
+              </Box>
+            } />
+          </Routes>
+        </MainLayout>
+      </Box>
+    </Box>
   );
-};
+}
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
+
+export default App;

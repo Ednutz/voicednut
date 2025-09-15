@@ -15,8 +15,8 @@ module.exports = (bot) => {
                 return ctx.reply('❌ You are not authorized to use this bot.');
             }
 
-            // Use the Vercel deployment URL
-            const webAppUrl = process.env.WEBAPP_URL || 'https://your-vercel-deployment-url.vercel.app';
+            // Use the development server URL for testing
+            const webAppUrl = process.env.WEBAPP_URL || 'http://localhost:5173';
             
             console.log('Opening Mini App for user:', ctx.from.id, 'URL:', webAppUrl);
             

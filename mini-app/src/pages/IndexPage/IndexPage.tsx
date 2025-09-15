@@ -1,38 +1,13 @@
-import { type FC, useState, useEffect, type FormEvent, useCallback } from 'react';
-import { useWebSocket } from '@/contexts/WebSocketContext';
-import { AsyncContent, LoadingSpinner } from '@/components/common/AsyncContent/AsyncContent';
-import { DataCard } from '@/components/common/DataCard/DataCard';
-import './IndexPage.css';
+import { FC, useState, useEffect, useCallback, FormEvent } from 'react';
+import { AsyncContent } from '../../components/common/AsyncContent/AsyncContent';
+import { DataCard } from '../../components/common/DataCard/DataCard';
+import { useWebSocket } from '../../contexts/WebSocketContext';
+import { type UserStats } from '../../types/stats';
 
-interface UserStats {
-  total_calls: number;
-  total_sms: number;
-  this_month_calls: number;
-  this_month_sms: number;
-  success_rate: number;
-  last_activity: string;
-  call_trend?: {
-    value: number;
-    isPositive: boolean;
-  };
-  sms_trend?: {
-    value: number;
-    isPositive: boolean;
-  };
-}
-
-interface CallFormData {
-  phone: string;
-  prompt: string;
-  first_message: string;
-}
-
-interface ApiResponse {
-  success: boolean;
-  error?: string;
-}
+import { type CallFormData, type ApiResponse } from '../../types/stats';
 
 export const IndexPage: FC = () => {
+  const { isConnected } = useWebSocket();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'call' | 'sms'>('dashboard');
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
