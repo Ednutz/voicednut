@@ -1,13 +1,9 @@
 const { InlineKeyboard } = require('grammy');
 const { getUser, isAdmin } = require('../db/db');
-const crypto = require('crypto');
 const config = require('../config');
 
-// Store pending operations from Mini App
-const pendingOperations = new Map();
-
 module.exports = (bot) => {
-    // Command to open Mini App
+    // Command to open Mini App (/app)
     bot.command('app', async (ctx) => {
         try {
             const user = await new Promise(r => getUser(ctx.from.id, r));
@@ -15,21 +11,24 @@ module.exports = (bot) => {
                 return ctx.reply('❌ You are not authorized to use this bot.');
             }
 
-            // Use the development server URL for testing
-            const webAppUrl = process.env.WEBAPP_URL || 'http://localhost:5173';
-            
-            console.log('Opening Mini App for user:', ctx.from.id, 'URL:', webAppUrl);
+            // Check if Mini App URL is configured
+            if (!config.webAppUrl) {
+                return ctx.reply('❌ Mini App is not configured. Please contact the administrator.');
+            }
+
+            console.log('Opening Mini App for user:', ctx.from.id, 'URL:', config.webAppUrl);
             
             const keyboard = new InlineKeyboard()
-                .webApp('🚀 Open Voicednut App', webAppUrl);
+                .webApp('🚀 Open VoicedNut App', config.webAppUrl);
 
             await ctx.reply(
-                '🎙️ *Voicednut Bot Mini App*\n\n' +
+                '🎙️ *VoicedNut Bot Mini App*\n\n' +
                 'Click the button below to open the enhanced interface with:\n' +
                 '• 📞 Easy voice call setup\n' +
                 '• 💬 SMS messaging\n' +
                 '• 📊 Activity tracking\n' +
-                '• 🎨 Beautiful user interface\n\n' +
+                '• 🎨 Beautiful user interface\n' +
+                '• 👥 User management (Admin only)\n\n' +
                 '_The Mini App provides a much better experience than regular bot commands._',
                 { 
                     parse_mode: 'Markdown',
@@ -42,7 +41,13 @@ module.exports = (bot) => {
         }
     });
 
-    // Handle web app data from Mini App
+    // Alternative command (/webapp)
+    bot.command('webapp', async (ctx) => {
+        // Just redirect to /app command
+        await ctx.reply('Use /app to open the Mini App!');
+    });
+
+    // Handle web app data received from the Mini App
     bot.on('message:web_app_data', async (ctx) => {
         try {
             const user = await new Promise(r => getUser(ctx.from.id, r));
@@ -61,10 +66,52 @@ module.exports = (bot) => {
         }
     });
 
-    // Add Mini App button to existing start command response
-    bot.use(async (ctx, next) => {
-        // This middleware can add Mini App buttons to other responses if needed
-        await next();
+    // Command for getting Mini App info
+    bot.command('miniappinfo', async (ctx) => {
+        try {
+            const user = await new Promise(r => getUser(ctx.from.id, r));
+            if (!user) {
+                return ctx.reply('❌ You are not authorized to use this bot.');
+            }
+
+            const isAdminUser = await new Promise(r => isAdmin(ctx.from.id, r));
+            
+            let infoText = `ℹ️ *Mini App Information*\n\n`;
+            infoText += `🌐 Status: ${config.webAppUrl ? '✅ Configured' : '❌ Not Configured'}\n`;
+            
+            if (config.webAppUrl) {
+                infoText += `🔗 URL: \`${config.webAppUrl}\`\n`;
+                infoText += `🚀 Features Available:\n`;
+                infoText += `  • Voice calls management\n`;
+                infoText += `  • SMS messaging\n`;
+                infoText += `  • Real-time notifications\n`;
+                infoText += `  • Activity tracking\n`;
+                
+                if (isAdminUser) {
+                    infoText += `  • User management\n`;
+                    infoText += `  • System statistics\n`;
+                    infoText += `  • Admin controls\n`;
+                }
+                
+                infoText += `\n🎯 Use /app to open the Mini App`;
+            } else {
+                infoText += `\n⚠️ Mini App is not configured. Contact admin.`;
+            }
+            
+            const kb = new InlineKeyboard();
+            if (config.webAppUrl) {
+                kb.webApp('🚀 Open Mini App', config.webAppUrl);
+            }
+            
+            await ctx.reply(infoText, {
+                parse_mode: 'Markdown',
+                reply_markup: kb
+            });
+            
+        } catch (error) {
+            console.error('Mini App info error:', error);
+            await ctx.reply('❌ Error getting Mini App information.');
+        }
     });
 };
 
@@ -92,6 +139,31 @@ async function handleMiniAppAction(ctx, data, user) {
                 await handleMiniAppSms(ctx, params, user);
             }
             break;
+
+        case 'user_added':
+            if (result === 'success') {
+                await ctx.reply(`✅ User @${params.username} added successfully!`, 
+                    { parse_mode: 'Markdown' });
+            } else {
+                await ctx.reply(`❌ Failed to add user: ${params.error || 'Unknown error'}`);
+            }
+            break;
+
+        case 'user_removed':
+            if (result === 'success') {
+                await ctx.reply(`✅ User removed successfully!`);
+            } else {
+                await ctx.reply(`❌ Failed to remove user: ${params.error || 'Unknown error'}`);
+            }
+            break;
+
+        case 'user_promoted':
+            if (result === 'success') {
+                await ctx.reply(`✅ User promoted to admin successfully!`);
+            } else {
+                await ctx.reply(`❌ Failed to promote user: ${params.error || 'Unknown error'}`);
+            }
+            break;
             
         case 'get_stats':
             await handleMiniAppStats(ctx, user);
@@ -99,6 +171,11 @@ async function handleMiniAppAction(ctx, data, user) {
             
         case 'get_recent_activity':
             await handleMiniAppActivity(ctx, user);
+            break;
+
+        case 'notification':
+            // Handle notifications from Mini App
+            await ctx.reply(`🔔 ${params.message || 'Notification from Mini App'}`);
             break;
             
         default:
@@ -121,7 +198,7 @@ async function handleMiniAppCall(ctx, params, user) {
         // Validate phone format
         const e164Regex = /^\+[1-9]\d{1,14}$/;
         if (!e164Regex.test(phone.trim())) {
-            await ctx.reply('❌ Invalid phone number format');
+            await ctx.reply('❌ Invalid phone number format. Use E.164 format like +1234567890');
             return;
         }
 
@@ -142,7 +219,7 @@ async function handleMiniAppCall(ctx, params, user) {
         });
 
         if (response.data.success && response.data.call_sid) {
-            const successMsg = `✅ *Call Placed Successfully via Bot!*\n\n` +
+            const successMsg = `✅ *Call Placed Successfully via Mini App!*\n\n` +
                 `📞 To: ${response.data.to}\n` +
                 `🆔 Call SID: \`${response.data.call_sid}\`\n` +
                 `📊 Status: ${response.data.status}\n\n` +
@@ -180,7 +257,7 @@ async function handleMiniAppSms(ctx, params, user) {
 
         // Basic phone validation
         if (!phone.startsWith('+') || phone.length < 10) {
-            await ctx.reply('❌ Invalid phone number format');
+            await ctx.reply('❌ Invalid phone number format. Use E.164 format like +1234567890');
             return;
         }
 
@@ -198,7 +275,7 @@ async function handleMiniAppSms(ctx, params, user) {
         });
 
         if (response.data.success) {
-            const successMsg = `✅ *SMS Sent Successfully via Bot!*\n\n` +
+            const successMsg = `✅ *SMS Sent Successfully via Mini App!*\n\n` +
                 `📱 To: ${phone}\n` +
                 `📄 Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}\n` +
                 `🆔 Message SID: \`${response.data.message_sid}\``;
@@ -320,8 +397,11 @@ function formatTimeAgo(dateString) {
 
 // Add Mini App button to existing menus (utility function)
 function addMiniAppButton(keyboard) {
-    const webAppUrl = process.env.WEBAPP_URL || config.webAppUrl || 'https://your-vercel-app.vercel.app/miniapp.html';
-    return keyboard.row().webApp('🚀 Open Mini App', webAppUrl);
+    if (config.webAppUrl) {
+        return keyboard.row().webApp('🚀 Open Mini App', config.webAppUrl);
+    }
+    return keyboard;
 }
 
+// Export utility function for other modules
 module.exports.addMiniAppButton = addMiniAppButton;

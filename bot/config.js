@@ -36,5 +36,17 @@ module.exports = {
       'https://web.telegram.org',
       process.env.WEB_APP_URL
     ]
+  },
+  features: {
+        webApp: process.env.ENABLE_WEBAPP !== 'false',
+        autoTranscript: process.env.AUTO_TRANSCRIPT !== 'false',
+        adminCommands: process.env.ENABLE_ADMIN_COMMANDS !== 'false'
+      },
+    
+    // API timeouts and retries
+  api: {
+        timeout: parseInt(process.env.API_TIMEOUT) || 30000,
+        maxRetries: parseInt(process.env.API_MAX_RETRIES) || 3,
+        retryDelay: parseInt(process.env.API_RETRY_DELAY) || 1000
   }
 };

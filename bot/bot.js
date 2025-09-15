@@ -46,6 +46,10 @@ const { promoteFlow, registerPromoteCommand } = require('./commands/promote');
 const { removeUserFlow, registerRemoveUserCommand } = require('./commands/removeuser');
 const { smsFlow, bulkSmsFlow, scheduleSmsFlow, registerSmsCommands } = require('./commands/sms');
 
+// Initialize WebApp Handler
+const WebAppHandler = require('./webapp/webAppHandler');
+const webAppHandler = new WebAppHandler(bot);
+
 // Register conversations with error handling
 bot.use(wrapConversation(callFlow, "call-conversation"));
 bot.use(wrapConversation(addUserFlow, "adduser-conversation"));
@@ -62,7 +66,6 @@ registerPromoteCommand(bot);
 registerRemoveUserCommand(bot);
 registerSmsCommands(bot);
 
-
 // Register non-conversation commands
 require('./commands/users')(bot);
 require('./commands/help')(bot);
@@ -70,7 +73,7 @@ require('./commands/menu')(bot);
 require('./commands/guide')(bot);
 require('./commands/transcript')(bot);
 require('./commands/api')(bot);
-require('./commands/webapp')(bot);
+require('./commands/webapp')(bot);  // This should work now with WebAppHandler
 
 // Start command handler
 bot.command('start', async (ctx) => {
@@ -163,6 +166,11 @@ bot.on('callback_query:data', async (ctx) => {
 
         const action = ctx.callbackQuery.data;
         console.log(`Callback query received: ${action} from user ${ctx.from.id}`);
+
+        // Check if this is a webapp callback - let WebAppHandler handle it
+        if (action.startsWith('webapp:')) {
+            return; // WebAppHandler will handle this
+        }
 
         // Verify user authorization
         const user = await new Promise(r => getUser(ctx.from.id, r));
@@ -260,11 +268,11 @@ bot.on('callback_query:data', async (ctx) => {
                 await ctx.conversation.enter('schedule-sms-conversation');
                 break;
             
-                case 'SMS_STATS':
-                    if (isAdminUser) {
-                        await executeCommand(ctx, 'smsstats');
-                    }
-                    break;
+            case 'SMS_STATS':
+                if (isAdminUser) {
+                    await executeCommand(ctx, 'smsstats');
+                }
+                break;
                 
             default:
                 console.log(`Unknown callback action: ${action}`);
@@ -460,6 +468,11 @@ async function executeMenuCommand(ctx, isAdminUser) {
         .row()
         .text('📚 Guide', 'GUIDE');
 
+    // Add Mini App button if configured
+    if (config.webAppUrl) {
+        kb.row().webApp('🚀 Open Mini App', config.webAppUrl);
+    }
+
     if (isAdminUser) {
         kb.row()
             .text('📤 Bulk SMS', 'BULK_SMS')
@@ -484,7 +497,6 @@ async function executeMenuCommand(ctx, isAdminUser) {
         reply_markup: kb
     });
 }
-
 
 async function executeHealthCommand(ctx) {
     const axios = require('axios');
@@ -684,7 +696,7 @@ async function executeCallsCommand(ctx) {
     }
 }
 
-// Mini App command handler
+// Mini App command handler (now enhanced with WebAppHandler integration)
 bot.command('miniapp', async (ctx) => {
     try {
         // Verify user authorization
@@ -724,6 +736,7 @@ bot.command('miniapp', async (ctx) => {
 bot.api.setMyCommands([
     { command: 'start', description: 'Start or restart the bot' },
     { command: 'miniapp', description: 'Open the Voice Call Mini App' },
+    { command: 'app', description: 'Open the Voice Call Mini App' },
     { command: 'call', description: 'Start outbound voice call' },
     { command: 'sms', description: 'Send SMS message' },
     { command: 'transcript', description: 'Get call transcript by SID' },
