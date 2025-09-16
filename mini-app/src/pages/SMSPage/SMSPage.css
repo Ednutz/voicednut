@@ -1,0 +1,35 @@
+.sms-page {
+  min-height: 100vh;
+  background-color: var(--background-color);
+}
+
+.page-header {
+  text-align: center;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--spacing-lg);
+  background: var(--tg-secondary-bg-color);
+}
+
+.page-title {
+  font-size: var(--font-size-xxl);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-color);
+}
+
+.page-subtitle {
+  color: var(--secondary-text);
+  font-size: var(--font-size-md);
+}
+
+.page-content {
+  padding: 0 var(--spacing-lg) var(--spacing-xl);
+}
+
+.sms-form {
+  background: var(--tg-secondary-bg-color);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+}

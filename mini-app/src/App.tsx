@@ -1,330 +1,97 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import {
-  ThemeProvider,
-  CssBaseline,
-  Box,
-  Drawer,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Alert,
-  CircularProgress,
-  Snackbar
-} from '@mui/material';
-import {
-  Phone as PhoneIcon,
-  Sms as SmsIcon,
-  Group as UsersIcon,
-  Description as TranscriptsIcon,
-  Settings as SettingsIcon,
-  Home as HomeIcon
-} from '@mui/icons-material';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useTelegram } from './hooks/useTelegram';
+import { useAuth } from './hooks/useAuth';
+import { useNotifications } from './hooks/useNotifications';
 
-import { createTelegramTheme } from './styles/telegramTheme';
-import { telegramWebApp } from './utils/telegramWebApp';
-import { apiService } from './services/apiService';
-import { MainLayout } from './components/MainLayout';
-import { CallManager } from './components/CallManager/CallManager';
-import { SMSComposer } from './components/SMSComposer/SMSComposer';
-import { UserManager } from './components/UserManager/UserManager';
-import { TranscriptViewer } from './components/TranscriptViewer/TranscriptViewer';
-import { DashboardPage } from './pages/DashboardPage/DashboardPage';
-import { ROUTES } from './routes/constants';
+// Import your page components
+import HomePage from './pages/HomePage/HomePage';
+import CallsPage from './pages/CallsPage/CallsPage';
+import SMSPage from './pages/SMSPage/SMSPage';
+import AdminPage from './pages/AdminPage/AdminPage';
+import LoadingScreen from './components/common/LoadingScreen/LoadingScreen';
+import ErrorScreen from './components/common/ErrorScreen/ErrorScreen';
+import Navigation from './components/common/Navigation/Navigation';
 
-const navItems = [
-  { path: ROUTES.HOME, label: 'Dashboard', icon: HomeIcon, requireAdmin: false },
-  { path: ROUTES.CALL, label: 'Make Call', icon: PhoneIcon, requireAdmin: false },
-  { path: ROUTES.SMS, label: 'Send SMS', icon: SmsIcon, requireAdmin: false },
-  { path: ROUTES.USERS, label: 'Users', icon: UsersIcon, requireAdmin: true },
-  { path: ROUTES.TRANSCRIPTS, label: 'Transcripts', icon: TranscriptsIcon, requireAdmin: true },
-  { path: ROUTES.SETTINGS, label: 'Settings', icon: SettingsIcon, requireAdmin: false },
-];
+import './styles/globals.css';
 
-interface AppState {
-  initialized: boolean;
-  authorized: boolean;
-  isAdmin: boolean;
-  error: string | null;
-  theme: any;
-  drawerOpen: boolean;
-}
-
-function AppContent() {
-  const [state, setState] = useState<AppState>({
-    initialized: false,
-    authorized: false,
-    isAdmin: false,
-    error: null,
-    theme: createTelegramTheme(),
-    drawerOpen: false
-  });
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
-    open: false,
-    message: '',
-    severity: 'info'
-  });
-
-  const navigate = useNavigate();
-  const location = useLocation();
+const App: React.FC = () => {
+  const { tg, user, isReady, themeParams, colorScheme } = useTelegram();
+  const { isAuthenticated, isAdmin, isLoading: authLoading, error: authError } = useAuth();
+  const { error: notifyError } = useNotifications();
+  const [currentPage, setCurrentPage] = useState('home');
 
   useEffect(() => {
-    initializeApp();
-    
-    // Listen for theme changes
-    const handleThemeChange = () => {
-      setState(prev => ({ ...prev, theme: createTelegramTheme() }));
-    };
-    
-    window.addEventListener('telegramThemeChanged', handleThemeChange);
-    return () => window.removeEventListener('telegramThemeChanged', handleThemeChange);
-  }, []);
+    // Apply Telegram theme colors to CSS variables
+    if (themeParams && isReady) {
+      const root = document.documentElement;
 
-  useEffect(() => {
-    // Update back button based on current route
-    if (location.pathname !== ROUTES.HOME) {
-      telegramWebApp.showBackButton(() => {
-        if (window.history.length > 1) {
-          navigate(-1);
-        } else {
-          navigate(ROUTES.HOME);
+      Object.entries(themeParams).forEach(([key, value]) => {
+        if (value) {
+          root.style.setProperty(`--tg-${key.replace(/_/g, '-')}`, value);
         }
       });
-    } else {
-      telegramWebApp.hideBackButton();
+
+      // Set color scheme class
+      document.body.className = `theme-${colorScheme}`;
     }
+  }, [themeParams, colorScheme, isReady]);
 
-    return () => telegramWebApp.hideBackButton();
-  }, [location.pathname, navigate]);
-
-  const initializeApp = async () => {
-    try {
-      // Initialize Telegram WebApp
-      await telegramWebApp.initialize();
-      
-      // Check user authorization
-      const authResponse = await apiService.checkUserAuthorization();
-      
-      if (authResponse.success && authResponse.data) {
-        setState(prev => ({
-          ...prev,
-          initialized: true,
-          authorized: authResponse.data!.authorized,
-          isAdmin: authResponse.data!.isAdmin
-        }));
-
-        if (!authResponse.data.authorized) {
-          showMessage('You are not authorized to use this bot. Please contact an administrator.', 'error');
-        } else {
-          showMessage('Welcome to VoicedNut!', 'success');
-        }
-      } else {
-        throw new Error(authResponse.error || 'Failed to check authorization');
-      }
-    } catch (error: any) {
-      console.error('App initialization error:', error);
-      setState(prev => ({
-        ...prev,
-        initialized: true,
-        error: error.message || 'Failed to initialize app'
-      }));
-      showMessage('Failed to initialize app. Please try again.', 'error');
+  useEffect(() => {
+    // Handle authentication errors
+    if (authError) {
+      notifyError('Authentication failed. Please restart the bot.');
     }
-  };
+  }, [authError, notifyError]);
 
-  const showMessage = (message: string, severity: 'success' | 'error' | 'info') => {
-    setSnackbar({ open: true, message, severity });
-  };
+  // Show loading screen while initializing
+  if (!isReady || authLoading) {
+    return <LoadingScreen message='Initializing VoicedNut...' />;
+  }
 
-  const handleNavigation = (path: string) => {
-    navigate(path);
-    setState(prev => ({ ...prev, drawerOpen: false }));
-    telegramWebApp.impactOccurred('light');
-  };
-
-  const handleDrawerToggle = () => {
-    setState(prev => ({ ...prev, drawerOpen: !prev.drawerOpen }));
-    telegramWebApp.impactOccurred('light');
-  };
-
-  const getAvailableNavItems = () => {
-    return navItems.filter(item => !item.requireAdmin || state.isAdmin);
-  };
-
-  // Loading state
-  if (!state.initialized) {
+  // Show error screen if not authenticated
+  if (!isAuthenticated) {
     return (
-      <ThemeProvider theme={state.theme}>
-        <CssBaseline />
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '100vh',
-            gap: 2,
-            p: 3
-          }}
-        >
-          <CircularProgress size={48} />
-          <Box sx={{ textAlign: 'center' }}>
-            <h2>VoicedNut</h2>
-            <p>Initializing...</p>
-          </Box>
-        </Box>
-      </ThemeProvider>
+      <ErrorScreen
+        title='Access Denied'
+        message='You are not authorized to use this Mini App. Please contact an administrator.'
+        action={{
+          label: 'Contact Admin',
+          onClick: () => tg?.close()
+        }}
+      />
     );
   }
 
-  // Error state
-  if (state.error) {
-    return (
-      <ThemeProvider theme={state.theme}>
-        <CssBaseline />
-        <Box sx={{ p: 3 }}>
-          <Alert severity="error">
-            <strong>Initialization Error</strong><br />
-            {state.error}
-          </Alert>
-        </Box>
-      </ThemeProvider>
-    );
-  }
-
-  // Unauthorized state
-  if (!state.authorized) {
-    return (
-      <ThemeProvider theme={state.theme}>
-        <CssBaseline />
-        <Box sx={{ p: 3 }}>
-          <Alert severity="warning">
-            <strong>Access Denied</strong><br />
-            You are not authorized to use this bot. Please contact an administrator to get access.
-          </Alert>
-        </Box>
-      </ThemeProvider>
-    );
-  }
-
-  // Main app
   return (
-    <ThemeProvider theme={state.theme}>
-      <CssBaseline />
-      <Box sx={{ display: 'flex' }}>
-        {/* Navigation Drawer */}
-        <Drawer
-          anchor="left"
-          open={state.drawerOpen}
-          onClose={() => setState(prev => ({ ...prev, drawerOpen: false }))}
-          PaperProps={{
-            sx: {
-              width: 280,
-              bgcolor: 'background.paper',
-              color: 'text.primary',
-            },
-          }}
-        >
-          <List sx={{ pt: 2 }}>
-            {getAvailableNavItems().map(({ path, label, icon: Icon }) => (
-              <ListItem
-                button
-                key={path}
-                onClick={() => handleNavigation(path)}
-                selected={location.pathname === path}
-                sx={{
-                  mx: 1,
-                  borderRadius: 2,
-                  '&.Mui-selected': {
-                    bgcolor: 'primary.light',
-                    color: 'primary.contrastText',
-                    '& .MuiListItemIcon-root': {
-                      color: 'inherit',
-                    },
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
-                  <Icon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary={label} 
-                  primaryTypographyProps={{ fontWeight: location.pathname === path ? 600 : 400 }}
-                />
-              </ListItem>
-            ))}
-          </List>
-        </Drawer>
-
-        {/* Main Content */}
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            minHeight: '100vh',
-            bgcolor: 'background.default',
-            color: 'text.primary',
-          }}
-        >
-          <MainLayout 
-            title="VoicedNut" 
-            onMenuClick={handleDrawerToggle}
-          >
+    <div className='app'>
+      <Router>
+        <div className='app-container'>
+          {/* Main Content */}
+          <main className='app-main'>
             <Routes>
-              <Route path={ROUTES.HOME} element={<DashboardPage />} />
-              <Route path={ROUTES.CALL} element={<CallManager />} />
-              <Route path={ROUTES.SMS} element={<SMSComposer />} />
-              {state.isAdmin && (
-                <>
-                  <Route path={ROUTES.USERS} element={<UserManager />} />
-                  <Route path={ROUTES.TRANSCRIPTS} element={<TranscriptViewer />} />
-                </>
-              )}
-              <Route path={ROUTES.SETTINGS} element={
-                <Box sx={{ p: 3, textAlign: 'center' }}>
-                  <SettingsIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                  <h2>Settings</h2>
-                  <p>Settings feature coming soon...</p>
-                </Box>
-              } />
-              {/* Catch all route */}
-              <Route path="*" element={
-                <Box sx={{ p: 3, textAlign: 'center' }}>
-                  <h2>Page Not Found</h2>
-                  <p>The requested page could not be found.</p>
-                </Box>
-              } />
+              <Route
+                path='/'
+                element={<HomePage user={user} isAdmin={isAdmin} onNavigate={setCurrentPage} />}
+              />
+              <Route path='/calls' element={<CallsPage onNavigate={setCurrentPage} />} />
+              <Route path='/sms' element={<SMSPage onNavigate={setCurrentPage} />} />
+              <Route
+                path='/admin'
+                element={
+                  isAdmin ? <AdminPage onNavigate={setCurrentPage} /> : <Navigate to='/' replace />
+                }
+              />
+              <Route path='*' element={<Navigate to='/' replace />} />
             </Routes>
-          </MainLayout>
-        </Box>
-      </Box>
+          </main>
 
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert 
-          severity={snackbar.severity} 
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </ThemeProvider>
+          {/* Bottom Navigation */}
+          <Navigation currentPage={currentPage} isAdmin={isAdmin} onNavigate={setCurrentPage} />
+        </div>
+      </Router>
+    </div>
   );
-}
-
-function App() {
-  return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
-  );
-}
+};
 
 export default App;

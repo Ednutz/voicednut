@@ -1,0 +1,28 @@
+.dashboard-card {
+  background: var(--tg-secondary-bg-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-color);
+}
+
+.dashboard-card.clickable {
+  cursor: pointer;
+}
+
+.dashboard-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.card-title {
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-color);
+  font-size: var(--font-size-lg);
+}
+
+.card-content {
+  color: var(--text-color);
+}

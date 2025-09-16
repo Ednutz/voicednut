@@ -1,0 +1,78 @@
+.call-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.call-item {
+  cursor: pointer;
+}
+
+.call-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.call-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-sm);
+}
+
+.call-info {
+  flex: 1;
+}
+
+.call-phone {
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-color);
+}
+
+.call-time {
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text);
+}
+
+.call-status {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.call-status.status-completed {
+  background: var(--success-color);
+  color: white;
+}
+
+.call-status.status-failed {
+  background: var(--error-color);
+  color: white;
+}
+
+.call-status.status-in-progress {
+  background: var(--warning-color);
+  color: white;
+}
+
+.call-status.status-ringing {
+  background: var(--primary-color);
+  color: white;
+}
+
+.call-details {
+  display: flex;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text);
+}
+
+.call-duration,
+.call-transcript-count {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}

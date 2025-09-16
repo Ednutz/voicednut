@@ -1,0 +1,219 @@
+.home-page {
+  min-height: 100vh;
+  padding: var(--spacing-lg);
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: var(--background-color);
+}
+
+.home-header {
+  margin-bottom: var(--spacing-xl);
+  text-align: center;
+  padding: var(--spacing-lg) 0;
+}
+
+.welcome-title {
+  font-size: var(--font-size-xxl);
+  font-weight: 700;
+  margin-bottom: var(--spacing-xs);
+  background: linear-gradient(135deg, var(--primary-color), #6ab7ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: var(--primary-color); /* Fallback for browsers that don't support background-clip */
+}
+
+.welcome-subtitle {
+  color: var(--secondary-text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+}
+
+.section-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-color);
+}
+
+.quick-actions {
+  margin-bottom: var(--spacing-xl);
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.stats-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.activity-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+}
+
+.activity-icon {
+  font-size: 20px;
+  width: 32px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-title {
+  font-weight: 500;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-color);
+  font-size: var(--font-size-sm);
+}
+
+.activity-time {
+  font-size: var(--font-size-xs);
+  color: var(--secondary-text);
+}
+
+.activity-status {
+  flex-shrink: 0;
+}
+
+.status-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-completed,
+.status-delivered,
+.status-success {
+  background: var(--success-color);
+  color: white;
+}
+
+.status-failed,
+.status-error {
+  background: var(--error-color);
+  color: white;
+}
+
+.status-in-progress,
+.status-sending,
+.status-ringing {
+  background: var(--warning-color);
+  color: white;
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--secondary-text);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.6;
+}
+
+.health-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.health-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.health-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success-color);
+}
+
+.status-dot.status-online {
+  background: var(--success-color);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 4px rgba(76, 175, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
+
+.health-details {
+  font-size: var(--font-size-xs);
+  color: var(--secondary-text);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .home-page {
+    padding: var(--spacing-md);
+  }
+
+  .actions-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .welcome-title {
+    font-size: var(--font-size-xl);
+  }
+}
+
+@media (max-width: 480px) {
+  .activity-item {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .activity-status {
+    align-self: flex-end;
+  }
+
+  .health-indicator {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+}
