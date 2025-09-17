@@ -117,7 +117,9 @@ class WebAppHandler {
                 case 'sendSMS':
                     response = await this.handleSendSMS(userId, params);
                     break;
-
+                case 'healthCheck':
+                    response = await this.handleWebAppHealthCheck();
+                    break;
                 case 'getStats':
                     response = await this.handleGetStats(userId);
                     break;
@@ -459,6 +461,34 @@ class WebAppHandler {
             };
         }
     }
+    async handleWebAppHealthCheck() {
+    try {
+        const response = await axios.get(`${config.apiUrl}/health`, {
+            timeout: 5000
+        });
+        
+        return {
+            success: true,
+            data: {
+                api_status: response.data.status,
+                timestamp: new Date().toISOString(),
+                webapp_version: '2.0.0',
+                features: {
+                    calls: true,
+                    sms: true,
+                    admin: true,
+                    realtime: true
+                }
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: 'Health check failed'
+        };
+    }
+}
+
 
     async handleSendSMS(userId, data) {
         try {

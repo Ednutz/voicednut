@@ -3,44 +3,55 @@ const { getUser, isAdmin } = require('../db/db');
 const config = require('../config');
 
 module.exports = (bot) => {
-    // Command to open Mini App (/app)
-    bot.command('app', async (ctx) => {
-        try {
-            const user = await new Promise(r => getUser(ctx.from.id, r));
-            if (!user) {
-                return ctx.reply('❌ You are not authorized to use this bot.');
-            }
-
-            // Check if Mini App URL is configured
-            if (!config.webAppUrl) {
-                return ctx.reply('❌ Mini App is not configured. Please contact the administrator.');
-            }
-
-            console.log('Opening Mini App for user:', ctx.from.id, 'URL:', config.webAppUrl);
+    // Command to open Mini App 
+    bot.command(['app', 'miniapp', 'webapp'], async (ctx) => {
+    try {
+        // Verify user authorization
+        const user = await new Promise(r => getUser(ctx.from.id, r));
+        if (!user) {
+            const kb = new InlineKeyboard()
+                .text('📱 Contact Admin', `https://t.me/@${config.admin.username}`);
             
-            const keyboard = new InlineKeyboard()
-                .webApp('🚀 Open VoicedNut App', config.webAppUrl);
-
-            await ctx.reply(
-                '🎙️ *VoicedNut Bot Mini App*\n\n' +
-                'Click the button below to open the enhanced interface with:\n' +
-                '• 📞 Easy voice call setup\n' +
-                '• 💬 SMS messaging\n' +
-                '• 📊 Activity tracking\n' +
-                '• 🎨 Beautiful user interface\n' +
-                '• 👥 User management (Admin only)\n\n' +
-                '_The Mini App provides a much better experience than regular bot commands._',
-                { 
-                    parse_mode: 'Markdown',
-                    reply_markup: keyboard 
-                }
-            );
-        } catch (error) {
-            console.error('WebApp command error:', error);
-            await ctx.reply('❌ Error opening Mini App. Please try again later.');
+            return ctx.reply('*Access Restricted* ⚠️\n\n' +
+                'This bot requires authorization.\n' +
+                'Please contact an administrator to get access.', {
+                parse_mode: 'Markdown',
+                reply_markup: kb
+            });
         }
-    });
 
+        // Check if Mini App URL is configured
+        if (!config.webAppUrl) {
+            return ctx.reply('❌ Mini App is not configured. Please contact the administrator.');
+        }
+
+        const isOwner = await new Promise(r => isAdmin(ctx.from.id, r));
+        
+        const welcomeMessage = `🚀 *VoicedNut Mini App*\n\n` +
+            `Welcome to the enhanced ${isOwner ? 'admin' : 'user'} experience!\n\n` +
+            `✨ *What you can do:*\n` +
+            `• 📞 Make AI-powered voice calls\n` +
+            `• 💬 Send SMS messages\n` +
+            `• 📊 View real-time statistics\n` +
+            `• 📋 Access call history & transcripts\n` +
+            `• 🎨 Modern, intuitive interface\n` +
+            (isOwner ? `• 👥 Manage users & permissions\n` +
+                      `• 📈 Advanced admin features\n` : '') +
+            `\n*Click the button below to launch the Mini App!*`;
+
+        const kb = new InlineKeyboard()
+            .webApp('🚀 Launch VoicedNut', config.webAppUrl);
+
+        await ctx.reply(welcomeMessage, {
+            parse_mode: 'Markdown',
+            reply_markup: kb
+        });
+
+    } catch (error) {
+        console.error('Mini App command error:', error);
+        await ctx.reply('❌ Error launching Mini App. Please try again or contact support.');
+    }
+});
         // Command for getting Mini App info
     bot.command('miniappinfo', async (ctx) => {
         try {
