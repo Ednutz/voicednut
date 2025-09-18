@@ -22,31 +22,37 @@ module.exports = {
     userId: process.env.ADMIN_TELEGRAM_ID,
     username: process.env.ADMIN_TELEGRAM_USERNAME
   },
-  apiUrl: process.env.API_URL,
+  apiUrl: process.env.API_URL, // Your external voice call API
   botToken: process.env.BOT_TOKEN,
 
-  // New Mini App configuration
-  webAppUrl: process.env.WEB_APP_URL || 'https://your-domain.com/miniapp.html',
+  // Mini App configuration
+  webAppUrl: process.env.WEB_APP_URL,
   webAppSecret: process.env.WEB_APP_SECRET || 'your-web-app-secret',
-  webAppPort: process.env.WEB_APP_PORT || 8080,
+  
+  // Bot API server configuration (different from external API)
+  botApiPort: process.env.BOT_API_PORT || 3001,
+  botApiUrl: process.env.BOT_API_URL || `http://localhost:${process.env.BOT_API_PORT || 3001}`,
 
   // CORS settings for Mini App
   cors: {
     origins: [
       'https://web.telegram.org',
-      process.env.WEB_APP_URL
+      process.env.WEB_APP_URL,
+      'http://localhost:3000', // For development
+      'http://localhost:5173'  // Vite dev server
     ]
   },
+  
   features: {
-        webApp: process.env.ENABLE_WEBAPP !== 'false',
-        autoTranscript: process.env.AUTO_TRANSCRIPT !== 'false',
-        adminCommands: process.env.ENABLE_ADMIN_COMMANDS !== 'false'
-      },
+    webApp: process.env.ENABLE_WEBAPP !== 'false',
+    autoTranscript: process.env.AUTO_TRANSCRIPT !== 'false',
+    adminCommands: process.env.ENABLE_ADMIN_COMMANDS !== 'false'
+  },
     
-    // API timeouts and retries
+  // API timeouts and retries
   api: {
-        timeout: parseInt(process.env.API_TIMEOUT) || 30000,
-        maxRetries: parseInt(process.env.API_MAX_RETRIES) || 3,
-        retryDelay: parseInt(process.env.API_RETRY_DELAY) || 1000
+    timeout: parseInt(process.env.API_TIMEOUT) || 30000,
+    maxRetries: parseInt(process.env.API_MAX_RETRIES) || 3,
+    retryDelay: parseInt(process.env.API_RETRY_DELAY) || 1000
   }
 };

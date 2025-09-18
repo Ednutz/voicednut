@@ -1,10 +1,459 @@
 const { Bot, session, InlineKeyboard } = require('grammy');
 const { conversations, createConversation } = require('@grammyjs/conversations');
+const express = require('express');
+const cors = require('cors');
 const config = require('./config');
 
 // Bot initialization
 const token = config.botToken;
 const bot = new Bot(token);
+
+// Express server for Mini App API
+const app = express();
+
+// CORS configuration for Mini App
+app.use(cors({
+    origin: config.cors.origins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-User-ID', 'X-Telegram-Init-Data']
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Telegram WebApp data validation
+function validateTelegramWebAppData(initData) {
+    // For now, we'll do basic validation
+    // In production, you should implement proper HMAC validation
+    // according to Telegram's documentation
+    try {
+        if (!initData) return null;
+        
+        // Parse the init data
+        const urlParams = new URLSearchParams(initData);
+        const userParam = urlParams.get('user');
+        
+        if (!userParam) return null;
+        
+        const userData = JSON.parse(decodeURIComponent(userParam));
+        return userData;
+    } catch (error) {
+        console.error('Error validating Telegram WebApp data:', error);
+        return null;
+    }
+}
+
+// Middleware to validate Telegram WebApp requests
+const validateWebAppRequest = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const initData = req.headers['x-telegram-init-data'];
+    
+    let userId = null;
+    
+    // Try to get user ID from different sources
+    if (authHeader && authHeader.startsWith('tg-webapp ')) {
+        const webAppData = authHeader.replace('tg-webapp ', '');
+        const userData = validateTelegramWebAppData(webAppData);
+        if (userData) {
+            userId = userData.id;
+        }
+    } else if (initData) {
+        const userData = validateTelegramWebAppData(initData);
+        if (userData) {
+            userId = userData.id;
+        }
+    } else if (req.headers['x-user-id']) {
+        userId = parseInt(req.headers['x-user-id']);
+    }
+    
+    if (!userId) {
+        return res.status(401).json({ 
+            success: false, 
+            error: 'Unauthorized: Invalid Telegram WebApp data' 
+        });
+    }
+    
+    // Check if user is authorized in our bot
+    const { getUser, isAdmin } = require('./db/db');
+    const user = await new Promise(resolve => getUser(userId, resolve));
+    
+    if (!user) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'User not authorized for this bot' 
+        });
+    }
+    
+    // Add user info to request
+    req.telegramUser = user;
+    req.userId = userId;
+    req.isAdmin = user.role === 'ADMIN';
+    
+    next();
+};
+
+// Mini App API Routes
+app.get('/health', (req, res) => {
+    res.json({
+        success: true,
+        data: {
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            bot_status: 'online',
+            webapp_version: '2.0.0'
+        }
+    });
+});
+
+// Authentication check endpoint
+app.post('/api/auth/check', validateWebAppRequest, async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            data: {
+                authorized: true,
+                isAdmin: req.isAdmin,
+                user: {
+                    id: req.telegramUser.id,
+                    telegram_id: req.telegramUser.telegram_id,
+                    username: req.telegramUser.username,
+                    role: req.telegramUser.role,
+                    timestamp: req.telegramUser.timestamp
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Auth check error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Authentication check failed'
+        });
+    }
+});
+
+// Get users (admin only)
+app.get('/api/users', validateWebAppRequest, async (req, res) => {
+    try {
+        if (!req.isAdmin) {
+            return res.status(403).json({
+                success: false,
+                error: 'Admin access required'
+            });
+        }
+        
+        const { getUserList } = require('./db/db');
+        const users = await new Promise((resolve, reject) => {
+            getUserList((err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+        
+        res.json({
+            success: true,
+            data: users || []
+        });
+    } catch (error) {
+        console.error('Get users error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch users'
+        });
+    }
+});
+
+// Add user (admin only)
+app.post('/api/users', validateWebAppRequest, async (req, res) => {
+    try {
+        if (!req.isAdmin) {
+            return res.status(403).json({
+                success: false,
+                error: 'Admin access required'
+            });
+        }
+        
+        const { telegramId, username } = req.body;
+        
+        if (!telegramId || !username) {
+            return res.status(400).json({
+                success: false,
+                error: 'Telegram ID and username are required'
+            });
+        }
+        
+        const { addUser } = require('./db/db');
+        await new Promise((resolve, reject) => {
+            addUser(parseInt(telegramId), username, 'USER', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        
+        res.json({
+            success: true,
+            data: {
+                telegram_id: parseInt(telegramId),
+                username: username,
+                role: 'USER'
+            }
+        });
+    } catch (error) {
+        console.error('Add user error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to add user'
+        });
+    }
+});
+
+// Remove user (admin only)
+app.delete('/api/users/:telegramId', validateWebAppRequest, async (req, res) => {
+    try {
+        if (!req.isAdmin) {
+            return res.status(403).json({
+                success: false,
+                error: 'Admin access required'
+            });
+        }
+        
+        const { telegramId } = req.params;
+        
+        // Prevent admin from removing themselves
+        if (parseInt(telegramId) === req.userId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot remove yourself'
+            });
+        }
+        
+        const { removeUser } = require('./db/db');
+        await new Promise((resolve, reject) => {
+            removeUser(parseInt(telegramId), (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        
+        res.json({
+            success: true,
+            data: { telegram_id: parseInt(telegramId) }
+        });
+    } catch (error) {
+        console.error('Remove user error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to remove user'
+        });
+    }
+});
+
+// Promote user (admin only)
+app.put('/api/users/:telegramId/promote', validateWebAppRequest, async (req, res) => {
+    try {
+        if (!req.isAdmin) {
+            return res.status(403).json({
+                success: false,
+                error: 'Admin access required'
+            });
+        }
+        
+        const { telegramId } = req.params;
+        
+        const { promoteUser } = require('./db/db');
+        await new Promise((resolve, reject) => {
+            promoteUser(parseInt(telegramId), (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        
+        res.json({
+            success: true,
+            data: {
+                telegram_id: parseInt(telegramId),
+                role: 'ADMIN'
+            }
+        });
+    } catch (error) {
+        console.error('Promote user error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to promote user'
+        });
+    }
+});
+
+// Proxy calls to external API
+app.get('/api/calls', validateWebAppRequest, async (req, res) => {
+    try {
+        const axios = require('axios');
+        const { limit = 10 } = req.query;
+        
+        const response = await axios.get(`${config.apiUrl}/api/calls/list?limit=${limit}`, {
+            timeout: 15000,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        res.json({
+            success: true,
+            data: response.data.calls || response.data || []
+        });
+    } catch (error) {
+        console.error('Get calls error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch calls'
+        });
+    }
+});
+
+// Proxy call transcript
+app.get('/api/calls/:callSid', validateWebAppRequest, async (req, res) => {
+    try {
+        const axios = require('axios');
+        const { callSid } = req.params;
+        
+        const response = await axios.get(`${config.apiUrl}/api/calls/${callSid}`, {
+            timeout: 15000,
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+        
+        res.json({
+            success: true,
+            data: response.data
+        });
+    } catch (error) {
+        console.error('Get transcript error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch transcript'
+        });
+    }
+});
+
+// Initiate call
+app.post('/api/calls', validateWebAppRequest, async (req, res) => {
+    try {
+        const axios = require('axios');
+        const { phone, prompt, first_message } = req.body;
+        
+        if (!phone || !first_message) {
+            return res.status(400).json({
+                success: false,
+                error: 'Phone number and first message are required'
+            });
+        }
+        
+        // Validate phone format
+        const e164Regex = /^\+[1-9]\d{1,14}$/;
+        if (!e164Regex.test(phone.trim())) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid phone number format. Use E.164 format like +1234567890'
+            });
+        }
+        
+        const payload = {
+            number: phone,
+            prompt: prompt || 'You are a helpful AI assistant making a phone call.',
+            first_message: first_message,
+            user_chat_id: req.userId.toString()
+        };
+        
+        const response = await axios.post(`${config.apiUrl}/outbound-call`, payload, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        });
+        
+        res.json({
+            success: true,
+            data: response.data
+        });
+    } catch (error) {
+        console.error('Initiate call error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.response?.data?.error || 'Failed to initiate call'
+        });
+    }
+});
+
+// Send SMS
+app.post('/api/sms', validateWebAppRequest, async (req, res) => {
+    try {
+        const axios = require('axios');
+        const { phone, message } = req.body;
+        
+        if (!phone || !message) {
+            return res.status(400).json({
+                success: false,
+                error: 'Phone number and message are required'
+            });
+        }
+        
+        // Basic phone validation
+        if (!phone.startsWith('+') || phone.length < 10) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid phone number format. Use E.164 format like +1234567890'
+            });
+        }
+        
+        const payload = {
+            to: phone,
+            message: message,
+            user_chat_id: req.userId.toString()
+        };
+        
+        const response = await axios.post(`${config.apiUrl}/send-sms`, payload, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        });
+        
+        res.json({
+            success: true,
+            data: response.data
+        });
+    } catch (error) {
+        console.error('Send SMS error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.response?.data?.error || 'Failed to send SMS'
+        });
+    }
+});
+
+// Get user stats
+app.get('/api/stats', validateWebAppRequest, async (req, res) => {
+    try {
+        const axios = require('axios');
+        
+        const response = await axios.get(`${config.apiUrl}/user-stats/${req.userId}`, {
+            timeout: 10000
+        });
+        
+        res.json({
+            success: true,
+            data: response.data || { total_calls: 0, total_sms: 0 }
+        });
+    } catch (error) {
+        console.error('Get stats error:', error);
+        res.json({
+            success: true,
+            data: { total_calls: 0, total_sms: 0, error: 'Stats unavailable' }
+        });
+    }
+});
 
 // Initialize conversations with error handling wrapper
 function wrapConversation(handler, name) {
@@ -73,7 +522,10 @@ require('./commands/menu')(bot);
 require('./commands/guide')(bot);
 require('./commands/transcript')(bot);
 require('./commands/api')(bot);
-require('./commands/webapp')(bot);  // This should work now with WebAppHandler
+require('./commands/webapp')(bot);
+
+// Rest of your existing bot code (start command, callback handlers, etc.)
+// ... (keeping all your existing bot handlers exactly as they are)
 
 // Start command handler
 bot.command('start', async (ctx) => {
@@ -697,12 +1149,21 @@ async function executeCallsCommand(ctx) {
 }
 
 // Mini App command handler (now enhanced with WebAppHandler integration)
-bot.command('miniapp', async (ctx) => {
+// Enhanced /app command
+bot.command(['app', 'miniapp', 'webapp'], async (ctx) => {
     try {
         // Verify user authorization
         const user = await new Promise(r => getUser(ctx.from.id, r));
         if (!user) {
-            return ctx.reply('❌ You are not authorized to use this bot.');
+            const kb = new InlineKeyboard()
+                .text('📱 Contact Admin', `https://t.me/@${config.admin.username}`);
+            
+            return ctx.reply('*Access Restricted* ⚠️\n\n' +
+                'This bot requires authorization.\n' +
+                'Please contact an administrator to get access.', {
+                parse_mode: 'Markdown',
+                reply_markup: kb
+            });
         }
 
         // Check if Mini App URL is configured
@@ -710,22 +1171,28 @@ bot.command('miniapp', async (ctx) => {
             return ctx.reply('❌ Mini App is not configured. Please contact the administrator.');
         }
 
-        const kb = new InlineKeyboard()
-            .webApp('🚀 Launch Mini App', config.webAppUrl);
+        const isOwner = await new Promise(r => isAdmin(ctx.from.id, r));
+        
+        const welcomeMessage = `🚀 *VoicedNut Mini App*\n\n` +
+            `Welcome to the enhanced ${isOwner ? 'admin' : 'user'} experience!\n\n` +
+            `✨ *What you can do:*\n` +
+            `• 📞 Make AI-powered voice calls\n` +
+            `• 💬 Send SMS messages\n` +
+            `• 📊 View real-time statistics\n` +
+            `• 📋 Access call history & transcripts\n` +
+            `• 🎨 Modern, intuitive interface\n` +
+            (isOwner ? `• 👥 Manage users & permissions\n` +
+                      `• 📈 Advanced admin features\n` : '') +
+            `\n*Click the button below to launch the Mini App!*`;
 
-        await ctx.reply(
-            '🎯 *Voice Call Bot Mini App*\n\n' +
-            'Access enhanced features through our Mini App:\n' +
-            '• 📱 Modern interface\n' +
-            '• 🚀 Quick access to all features\n' +
-            '• 📊 Real-time call monitoring\n' +
-            '• 💬 Instant messaging\n\n' +
-            'Click the button below to open the Mini App.',
-            {
-                parse_mode: 'Markdown',
-                reply_markup: kb
-            }
-        );
+        const kb = new InlineKeyboard()
+            .webApp('🚀 Launch VoicedNut', config.webAppUrl);
+
+        await ctx.reply(welcomeMessage, {
+            parse_mode: 'Markdown',
+            reply_markup: kb
+        });
+
     } catch (error) {
         console.error('Mini App command error:', error);
         await ctx.reply('❌ Error launching Mini App. Please try again or contact support.');
@@ -773,12 +1240,47 @@ bot.on('message:text', async (ctx) => {
     }
 });
 
-// Start the bot
-console.log('🚀 Starting Voice Call Bot...');
-bot.start().then(() => {
-    console.log('✅ Voice Call Bot is running!');
-    console.log('🔄 Polling for updates...');
-}).catch((error) => {
-    console.error('❌ Failed to start bot:', error);
-    process.exit(1);
-});
+// Start both the bot and the Express server
+const PORT = process.env.BOT_API_PORT || 3001;
+
+async function startApplication() {
+    try {
+        // Start Express server for Mini App
+        const server = app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🌐 Mini App API server running on port ${PORT}`);
+            console.log(`📱 Mini App URL: ${config.webAppUrl}`);
+        });
+
+        // Start Telegram bot
+        console.log('🚀 Starting Voice Call Bot...');
+        await bot.start();
+        console.log('✅ Voice Call Bot is running!');
+        console.log('🔄 Polling for updates...');
+
+        // Graceful shutdown
+        process.on('SIGTERM', () => {
+            console.log('🛑 Received SIGTERM, shutting down gracefully...');
+            server.close(() => {
+                console.log('✅ Express server closed');
+                bot.stop();
+                process.exit(0);
+            });
+        });
+
+        process.on('SIGINT', () => {
+            console.log('🛑 Received SIGINT, shutting down gracefully...');
+            server.close(() => {
+                console.log('✅ Express server closed');
+                bot.stop();
+                process.exit(0);
+            });
+        });
+
+    } catch (error) {
+        console.error('❌ Failed to start application:', error);
+        process.exit(1);
+    }
+}
+
+// Start the application
+startApplication();
