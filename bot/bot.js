@@ -1248,6 +1248,7 @@ async function startApplication() {
         // Start Express server for Mini App
         const server = app.listen(PORT, '0.0.0.0', () => {
             console.log(`🌐 Mini App API server running on port ${PORT}`);
+            console.log(`🔗 Health check: http://18.118.121.26:${PORT}/health`);
             console.log(`📱 Mini App URL: ${config.webAppUrl}`);
         });
 
